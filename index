@@ -1,0 +1,879 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SwiftBasket Profit Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>[hidden]{display:none!important}
+
+/* Layout concept: a seven-step stepper. Each page asks one question, shows one or two charts, and ends in one highlighted takeaway band.
+   Colour roles: blue = measure, orange = problem or focus, green = clear gain, gray = no clear change. */
+:root{
+  --font:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --bg:#f4f3ef; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#6f6d67;
+  --grid:#e1e0d9; --axis:#c3c2b7; --line:rgba(11,11,11,.10);
+  --blue:#2a78d6; --blue-text:#1c5cab; --orange:#eb6834; --orange-text:#b8431a;
+  --green:#0ca30c; --green-text:#006300; --gray:#9a9890;
+  --feature:#14213d; --on-feature:#f6f4ee; --on-feature2:#c9d3e3;
+  --tint-blue:color-mix(in srgb,var(--blue) 12%,var(--surface));
+  --tint-orange:color-mix(in srgb,var(--orange) 14%,var(--surface));
+  --heat:#c2410c; --on-heat:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f0f0e; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#a3a198;
+    --grid:#2c2c2a; --axis:#383835; --line:rgba(255,255,255,.10);
+    --blue:#3987e5; --blue-text:#6da7ec; --orange:#d95926; --orange-text:#ec835a;
+    --green:#0ca30c; --green-text:#0ca30c; --gray:#6d6b64;
+    --feature:#1f2c4d; --on-feature:#f0efec; --on-feature2:#c3cde0; --on-heat:#f0efec;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#a3a198;
+  --grid:#2c2c2a; --axis:#383835; --line:rgba(255,255,255,.10);
+  --blue:#3987e5; --blue-text:#6da7ec; --orange:#d95926; --orange-text:#ec835a;
+  --green:#0ca30c; --green-text:#0ca30c; --gray:#6d6b64;
+  --feature:#1f2c4d; --on-feature:#f0efec; --on-feature2:#c3cde0; --on-heat:#f0efec;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.4;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 28px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px;letter-spacing:.01em;white-space:nowrap}
+.brand span{font-weight:500;color:var(--muted);margin-left:6px}
+.credit{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-top:1px}
+.nav{display:flex;gap:6px;overflow-x:auto;flex:1;min-width:0;padding-bottom:2px}
+.tab{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;color:var(--ink2)}
+.tab .n{font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted)}
+.tab:hover{border-color:var(--axis)}
+.tab[aria-current="page"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab[aria-current="page"] .n{color:var(--bg)}
+
+/* page */
+.page{display:flex;flex-direction:column;gap:16px}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.ph>div{min-width:0}
+h1{margin:0;font-size:clamp(26px,3.2vw,38px);line-height:1.1;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.lead{margin:6px 0 0;font-size:17px;color:var(--ink2);max-width:72ch;text-wrap:pretty}
+.seg{display:inline-flex;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:8px;padding:7px 14px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}
+.g21{grid-template-columns:1.25fr 1fr}
+.g12{grid-template-columns:1fr 1.25fr}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.card h2{margin:0;font-size:16px;font-weight:650;line-height:1.25;text-wrap:balance}
+.sub{margin:0;color:var(--muted);font-size:13.5px}
+.tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .v{font-size:30px;font-weight:700;line-height:1.1;letter-spacing:-.01em}
+.tile .l{font-size:13.5px;color:var(--ink2)}
+.bad{color:var(--orange-text)} .good{color:var(--green-text)} .blue{color:var(--blue-text)}
+.band{background:var(--feature);color:var(--on-feature);border-radius:14px;padding:15px 20px;font-size:16.5px;line-height:1.45}
+.band b{font-weight:650}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.chart{width:100%;min-width:0}
+.chart svg{display:block;max-width:100%;overflow:visible}
+
+/* svg text */
+.t{fill:var(--ink2);font-size:13.5px} .tb{fill:var(--ink);font-size:14px;font-weight:650}
+.tm{fill:var(--muted);font-size:12.5px} .to{fill:var(--orange-text);font-weight:650;font-size:13.5px}
+.tbl{fill:var(--blue-text);font-weight:650;font-size:13.5px} .tg{fill:var(--green-text);font-weight:650;font-size:13.5px}
+.gl{stroke:var(--grid);stroke-width:1} .ax{stroke:var(--axis);stroke-width:1.5}
+.hit{fill:transparent;cursor:pointer}
+.mk{cursor:default}
+.clickable{cursor:pointer}
+.clickable:hover{opacity:.82}
+
+/* context */
+.feature{background:var(--feature);color:var(--on-feature);border-radius:14px;padding:22px 24px;display:flex;flex-direction:column;gap:12px}
+.feature h2{margin:0;font-size:20px;font-weight:650}
+.feature p{margin:0;font-size:17px;line-height:1.5}
+.feature p.dim{color:var(--on-feature2)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:6px 12px;border-radius:999px;font-size:13.5px;font-weight:600;border:1px solid color-mix(in srgb,var(--on-feature) 35%,transparent)}
+.formula{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:15px}
+.fchip{padding:8px 12px;border-radius:10px;font-weight:600;font-size:14.5px}
+.fchip.pos{background:var(--tint-blue);color:var(--blue-text)}
+.fchip.neg{background:var(--tint-orange);color:var(--orange-text)}
+.fchip.res{background:var(--ink);color:var(--bg)}
+.op{color:var(--muted);font-weight:700}
+.tabs2{display:flex;gap:8px;flex-wrap:wrap}
+.tabs2 button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px;cursor:pointer;text-align:left}
+.tabs2 button small{display:block;font-weight:500;color:var(--muted);font-size:12.5px}
+.tabs2 button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tabs2 button[aria-pressed="true"] small{color:var(--bg);opacity:.8}
+.desc{margin:0;font-size:15px;color:var(--ink2);min-height:44px}
+
+/* repeat */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.mini{background:var(--bg);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px}
+.mini b{font-size:18px;font-weight:700;line-height:1.15}
+.mini span{font-size:12.5px;color:var(--ink2)}
+.stripH{font-size:14px;font-weight:650;margin:0}
+.quad{display:grid;grid-template-columns:56px 1fr 1fr;grid-template-rows:auto auto auto;gap:8px;align-items:stretch}
+.qh{font-size:13px;font-weight:650;color:var(--ink2);text-align:center;align-self:end}
+.qr{font-size:13px;font-weight:650;color:var(--ink2);display:flex;align-items:center;justify-content:center;text-align:center}
+.qc{border-radius:12px;padding:9px 14px;display:flex;flex-direction:column;gap:2px;cursor:default;border:1px solid transparent}
+.qc.hi{background:var(--tint-blue)} .qc.lo{background:var(--tint-orange)}
+.qc:hover{border-color:var(--axis)}
+.qc h3{margin:0;font-size:15px;font-weight:650}
+.qc .big{font-size:26px;font-weight:700;line-height:1.1}
+.qc .sm{font-size:13px;color:var(--ink2)}
+.pbar{height:6px;border-radius:3px;background:color-mix(in srgb,var(--ink) 12%,transparent);overflow:hidden;margin-top:4px}
+.pbar i{display:block;height:100%;background:var(--ink)}
+
+/* ops heat */
+.heat{display:grid;grid-template-columns:96px repeat(4,1fr);gap:6px;align-items:stretch}
+.heat .hh{font-size:13px;font-weight:650;color:var(--ink2);text-align:center;align-self:end;padding-bottom:2px}
+.heat .hr{font-size:13.5px;font-weight:650;display:flex;align-items:center}
+.heat .hc{border-radius:10px;min-height:58px;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;cursor:default}
+.note{margin:0;font-size:14px;color:var(--ink2)}
+.note b{color:var(--ink)}
+
+/* recommendation */
+.rec{display:flex;flex-direction:column;gap:10px}
+.tag{align-self:flex-start;font-size:12.5px;font-weight:650;padding:4px 10px;border-radius:999px;background:var(--tint-blue);color:var(--blue-text)}
+.num{width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700}
+.rh{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rec h2{font-size:20px;font-weight:700}
+.prize{font-size:25px;font-weight:700;line-height:1.15;letter-spacing:-.01em}
+.prize small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
+.rec dl{margin:0;display:flex;flex-direction:column;gap:9px}
+.rec dt{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.rec dd{margin:1px 0 0;font-size:15px;line-height:1.4}
+
+/* how */
+.lst{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.lst li{display:grid;grid-template-columns:78px 1fr;gap:10px;align-items:start;font-size:14px;line-height:1.35}
+.st{font-size:12px;font-weight:700;padding:3px 0;border-radius:999px;text-align:center}
+.st.ok{background:var(--tint-blue);color:var(--blue-text)}
+.st.fix{background:var(--tint-orange);color:var(--orange-text)}
+.fld{display:flex;gap:6px;flex-wrap:wrap}
+.fld span{font-size:12.5px;padding:3px 9px;border-radius:7px;background:var(--bg);border:1px solid var(--line);color:var(--ink2);cursor:help}
+.fld.used span{background:var(--tint-blue);color:var(--blue-text);border-color:transparent}
+.fld.not span{background:var(--tint-orange);color:var(--orange-text);border-color:transparent}
+.fld.out span{background:var(--bg);color:var(--ink2);border:1px dashed var(--axis)}
+.lane{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+.lane h3{margin:0;font-size:14.5px;font-weight:650}
+.lane h3 em{font-style:normal;font-weight:500;color:var(--muted);margin-left:6px}
+.lane.strict{border-color:var(--blue)}
+.ai{font-size:16px;line-height:1.5;margin:0}
+.btn{align-self:flex-start;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:7px 14px;font-size:13.5px;font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--axis)}
+
+
+/* data model (context) */
+.dm{display:grid;grid-template-columns:1fr 74px 1fr 74px 1fr;grid-template-rows:auto 38px auto auto;align-items:stretch;gap:0}
+.dmb{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0}
+.dmb b{font-size:16px;font-weight:700}
+.dmb .r{font-size:13.5px;color:var(--ink2)}
+.dmb .u{font-size:12px;color:var(--muted);margin-top:4px}
+.dmb:hover{border-color:var(--axis)}
+.dmb[aria-pressed="true"]{background:var(--tint-blue);border-color:var(--blue)}
+.dmb[aria-pressed="true"] .u{color:var(--blue-text)}
+.lk{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);min-width:0}
+.lk i{display:block;width:100%;height:0;border-top:2px dashed var(--axis);position:relative}
+.lk i::after{content:"";position:absolute;right:-1px;top:-5px;border:4px solid transparent;border-left:7px solid var(--axis);border-right:0}
+.lk.rev i::after{right:auto;left:-1px;border-left:0;border-right:7px solid var(--axis)}
+.lk.v{flex-direction:row;justify-content:flex-start;padding-left:calc(50% - 1px);gap:8px}
+.lk.v i{width:0;height:100%;border-top:0;border-left:2px dashed var(--axis)}
+.lk.v i::after{right:auto;left:-5px;top:auto;bottom:-1px;border:4px solid transparent;border-top:7px solid var(--axis);border-bottom:0}
+.dmnote{grid-column:3/6;grid-row:3;margin-left:0;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 0 0 16px;font-size:14px;color:var(--ink2)}
+.dmnote b{color:var(--ink)}
+.dmd{grid-column:1/6;grid-row:4;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:8px}
+.dmd h3{margin:0;font-size:16px;font-weight:650}
+.dmd p{margin:0;font-size:15px;color:var(--ink2)}
+.dmd .fld span{cursor:default}
+.dmd .fld span.key{background:var(--tint-blue);color:var(--blue-text);border-color:transparent;font-weight:600}
+@media (max-width:700px){
+  .dm{grid-template-columns:1fr 1fr;grid-template-rows:none;gap:10px}
+  .lk{display:none}
+  .dmnote,.dmd{grid-column:1/3;grid-row:auto;padding-left:0}
+}
+
+/* pager */
+.pager{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+.pager #next{justify-self:end}.pager #prev{justify-self:start}
+.pager button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;display:flex;gap:8px;align-items:center}
+.pager button:disabled{opacity:.35;cursor:default}
+.dots{display:flex;gap:6px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--axis)}
+.dots i.on{background:var(--ink)}
+
+/* tooltip */
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);padding:8px 11px;border-radius:9px;font-size:13px;line-height:1.4;max-width:300px;box-shadow:0 6px 24px rgba(0,0,0,.2);opacity:0;transition:opacity .08s}
+#tip b{font-weight:650}
+#tip.on{opacity:1}
+
+@media (max-width:980px){
+  .g2,.g21,.g12{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  #prevL,#nextL{display:none}
+  .tile .v{font-size:25px}
+  .quad{grid-template-columns:44px 1fr 1fr}
+  .heat{grid-template-columns:70px repeat(4,1fr)}
+  .heat .hc{font-size:17px}
+  .lst li{grid-template-columns:1fr}
+  .st{width:70px}
+}
+
+/* fixed-size stage: every page gets the same frame, scaled to the window (wide screens only) */
+html.fit,html.fit body{height:100%;overflow:hidden}
+html.fit body{padding:0;display:flex;align-items:center;justify-content:center}
+html.fit .wrap{width:1360px;height:900px;max-width:none;margin:0;flex:none;zoom:var(--z,1);padding:14px 24px 16px;gap:12px}
+html.fit .page:not([hidden]){flex:1;min-height:0;gap:12px}
+html.fit .page>.grid{flex:1 1 auto;min-height:0}
+html.fit .page>.grid>.card{min-height:0}
+html.fit #p-context .grid>div:last-child>:last-child{flex:1}
+html.fit #p-context .grid>div:first-child>.feature{flex:none}
+html.fit #p-context .grid>div:first-child>.card{flex:1;justify-content:center;gap:16px}
+html.fit #p-context .formula{gap:12px}
+html.fit #p-context .fchip{font-size:17px;padding:10px 15px}
+html.fit #p-context .card h2{font-size:18px}
+html.fit #p-context .card .sub{font-size:15px}
+html.fit #p-context .feature,html.fit #p-context .grid>div>.card:last-child{justify-content:center}
+
+html.fit .rec dd{font-size:18px;line-height:1.45}
+html.fit .rec dl{gap:20px}
+html.fit #quad{flex:1;grid-template-rows:auto 1fr 1fr}
+html.fit #quad .qc{justify-content:center;gap:6px}
+html.fit #quad .qc .big{font-size:36px}
+html.fit #quad .qc h3{font-size:18px}
+html.fit #quad .qc .sm{font-size:15px}
+html.fit #p-how .lst{gap:16px}
+html.fit #p-how .lst li{font-size:16.5px;grid-template-columns:90px 1fr}
+html.fit #p-how .st{font-size:13px;padding:5px 0}
+html.fit #p-how .ai{font-size:21px;line-height:1.55}
+html.fit #p-how .card:has(.ai){justify-content:center;gap:16px}
+html.fit #p-promo .page>.grid>.card:last-child,html.fit #p-promo .grid>.card:last-child{justify-content:center;gap:16px}
+html.fit #p-promo .lane h3{font-size:16px}
+html.fit #p-promo .note{font-size:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">SwiftBasket<span>Profit review</span><small class="credit">Keerthana K | IIM Amritsar</small></div>
+    <nav class="nav" id="nav" aria-label="Dashboard pages"></nav>
+  </div>
+
+  <!-- 1 CONTEXT -->
+  <section class="page" id="p-context" hidden>
+    <div class="ph"><div><h1>Context</h1></div></div>
+    <div class="grid g2">
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="feature">
+          <h2>The business problem</h2>
+          <p>SwiftBasket is a quick-commerce company. Orders are growing, but profit is not growing in the same way.</p>
+          <p class="dim">The COO wants to know which growth is worth keeping. She suspects busy customers and fast-growing stores lose money through discounts, late deliveries, refunds and stock-outs.</p>
+          <div class="chips" aria-label="Questions answered in order">
+            <span class="chip">Business health</span><span class="chip">Profitable repeat behavior</span><span class="chip">Operational priorities</span><span class="chip">Promotion</span><span class="chip">Recommendation</span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>How we measure it: profit per order</h2>
+          <div class="formula">
+            <span class="fchip pos">Gross margin</span><span class="op">+</span><span class="fchip pos">Delivery fee</span><span class="op">−</span>
+            <span class="fchip neg">Discount</span><span class="op">−</span><span class="fchip neg">Picking cost</span><span class="op">−</span>
+            <span class="fchip neg">Delivery cost</span><span class="op">−</span><span class="fchip neg">Refund</span><span class="op">=</span><span class="fchip res">Profit per order</span>
+          </div>
+          <p class="sub">One number for every order, so growth is judged by profit, not by order count.</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="tiles" id="ctxTiles" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"></div>
+        <div class="card" id="dmCard"><div class="dm" id="dm"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 BUSINESS HEALTH -->
+  <section class="page" id="p-health" hidden>
+    <div class="ph">
+      <div><h1>Business Health</h1><p class="lead">Profit is thin, and 1 in 5 delivered orders loses money.</p></div>
+      <div class="seg" role="group" aria-label="Orders included">
+        <button type="button" data-seg="mode" data-val="all" aria-pressed="true">All orders</button>
+        <button type="button" data-seg="mode" data-val="delivered" aria-pressed="false">Delivered only</button>
+      </div>
+    </div>
+    <div class="tiles" id="hTiles"></div>
+    <div class="grid g21">
+      <div class="card">
+        <h2>Where an average order’s money goes (₹ per order)</h2>
+        <div class="chart" id="wf"></div>
+        <p class="note" id="wfNote"></p>
+      </div>
+      <div class="card">
+        <h2>Orders up 5%, profit per order flat</h2>
+        <p class="sub">Quarterly index, Q1 = 100</p>
+        <div class="legend" id="ixLegend"></div>
+        <div class="chart" id="ix"></div>
+      </div>
+    </div>
+    <div class="band" id="hBand"></div>
+  </section>
+
+  <!-- 3 REPEAT -->
+  <section class="page" id="p-repeat" hidden>
+    <div class="ph"><div><h1>Profitable Repeat Behavior</h1><p class="lead">The busiest customers earn the least per order.</p></div></div>
+    <div class="grid g21">
+      <div class="card">
+        <h2>Profit per order falls as customers order more</h2>
+        <div class="chart" id="bands"></div>
+      </div>
+      <div class="card">
+        <h2>Frequent does not mean profitable</h2>
+        <p class="sub">Customers by orders in 2025 and profit per order. High profit = at or above the company average of <span id="avgPpo"></span>.</p>
+        <div class="quad" id="quad"></div>
+      </div>
+    </div>
+    <div class="band" id="rBand"></div>
+  </section>
+
+  <!-- 4 OPS -->
+  <section class="page" id="p-ops" hidden>
+    <div class="ph"><div><h1>Operational Priorities</h1><p class="lead">Two leaks: stock-outs at weak stores, and delivery promises that ignore distance and peak hours.</p></div></div>
+    <div class="tiles" id="oTiles"></div>
+    <div class="grid g2">
+      <div class="card">
+        <h2>Low inventory accuracy, low profit per order</h2>
+        <div class="legend"><span><i style="background:var(--orange)"></i>90% accuracy or below (10 stores)</span><span><i style="background:var(--blue)"></i>Above 90% (26 stores)</span><span>Click a dot for store details</span></div>
+        <div class="chart" id="sc"></div>
+        <p class="stripH" id="stHead"></p>
+        <div class="strip" id="stStrip"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <h2 id="oRTitle">Late deliveries by promise and distance</h2>
+          <div class="seg" role="group" aria-label="Delivery view">
+            <button type="button" data-seg="ov" data-val="heat" aria-pressed="true">Promise × distance</button>
+            <button type="button" data-seg="ov" data-val="hour" aria-pressed="false">Hour of day</button>
+          </div>
+        </div>
+        <p class="sub" id="oRSub">% of delivered orders that arrive late</p>
+        <div class="chart" id="oR"></div>
+        <p class="note" id="oRNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 PROMO -->
+  <section class="page" id="p-promo" hidden>
+    <div class="ph">
+      <div><h1>Promotion</h1><p class="lead">Offers add orders but lose money overall. They work on lapsed or light customers, not active ones.</p></div>
+      <div class="seg" role="group" aria-label="Promotion view">
+        <button type="button" data-seg="pm" data-val="type" aria-pressed="true">By offer type</button>
+        <button type="button" data-seg="pm" data-val="group" aria-pressed="false">By customer group</button>
+      </div>
+    </div>
+    <div class="tiles" id="pTiles"></div>
+    <div class="grid g21">
+      <div class="card">
+        <h2 id="pTitle"></h2>
+        <p class="sub">Offer group minus no-offer group, per customer in the post-campaign window. Lines show the 95% range.</p>
+        <div class="legend"><span><i style="background:var(--orange)"></i>Loses money (clear)</span><span><i style="background:var(--green)"></i>Gains (clear)</span><span><i style="background:var(--blue)"></i>More orders (clear)</span><span><i style="background:var(--gray)"></i>No clear change</span></div>
+        <div class="chart" id="pc"></div>
+      </div>
+      <div class="card">
+        <h2>Who is “active”, and what we used to decide</h2>
+        <div class="lane strict">
+          <h3>Active customer <em>known before the campaign</em></h3>
+          <p class="note">Ordered in the last <b>90 days</b> and has <b>3+ orders</b>. Everyone else is lapsed or light.</p>
+          <div class="fld used"><span title="Days from the last order to 1 Jan 2026. Marked Yes in the data dictionary.">days_since_last_order</span><span title="Orders in the 12-month window. Marked Yes in the data dictionary.">historical_orders_12m</span></div>
+        </div>
+        <p class="note" id="pWhy"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 RECOMMENDATION -->
+  <section class="page" id="p-rec" hidden>
+    <div class="ph"><div><h1>Recommendation</h1></div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))" id="recGrid"></div>
+    <p class="sub">Action 1 is measured in the random test. Actions 2 and 3 assume the gap closes and orders hold, so each starts as a pilot.</p>
+  </section>
+
+  <!-- 7 HOW -->
+  <section class="page" id="p-how" hidden>
+    <div class="ph"><div><h1>How we got here</h1></div></div>
+    <div class="grid g2">
+      <div class="card">
+        <h2>What we checked and cleaned</h2>
+        <ul class="lst" id="chk"></ul>
+        <p class="note"><b>Nothing was deleted or edited.</b> All 30,000 orders are in every total.</p>
+      </div>
+      <div class="card">
+        <h2>What we used and what we left out</h2>
+        <p class="stripH">Used</p>
+        <div class="fld used" id="usedF"></div>
+        <p class="stripH">Left out</p>
+        <div class="fld not" id="notF"></div>
+        <p class="sub">Hover a field for the reason.</p>
+      </div>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h2>The decision-time rule: where we used it</h2>
+        <div class="lane">
+          <h3>Pages 2–4: describing what happened <em>any field</em></h3>
+          <p class="note">Profit, refunds, late deliveries and stock-outs are known only after an order. They are the yardstick here, so using them is correct.</p>
+        </div>
+        <div class="lane strict">
+          <h3>Pages 5–6: choosing who to target <em>only fields known before</em></h3>
+          <p class="note">Groups use days since last order, past orders, order count and store inventory accuracy. Results use post-campaign orders and profit, which are never used to pick a group.</p>
+          <div class="fld out"><span title="Known only after the order. Never used to pick a group.">refund</span><span title="Known only after delivery. Never used to pick a group.">late delivery</span><span title="Known only after picking. Never used to pick a group.">stock-out count</span><span title="An outcome. Never used as an input.">repeat_order_30d</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>How we used AI</h2>
+        <p class="ai" id="aiText">AI use: Claude helped me profile the data, run the calculations and build this dashboard. I set the structure and the data rules, and every figure was recomputed from the workbook and cross-checked.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="pager">
+    <button type="button" id="prev"><span aria-hidden="true">←</span><span id="prevL"></span></button>
+    <div class="dots" id="dots" aria-hidden="true"></div>
+    <button type="button" id="next"><span id="nextL"></span><span aria-hidden="true">→</span></button>
+  </div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const D = {"health":{"all":{"orders":30000,"profit_per_order":44.27,"margin_pct":7.9,"basket":559.7,"late":17.3,"refund_pct":26.2,"cancel_pct":1.02,"comps":{"gm":160.84,"fee":6.41,"disc":44.79,"pick":20.55,"dc":36.32,"ref":21.33},"q_orders":[7303,7433,7580,7684],"q_profit":[44.46,44.08,43.96,44.6],"q_total":[324681,327611,333247,342686],"total_profit":1328227},"delivered":{"orders":29695,"profit_per_order":48.87,"margin_pct":8.7,"basket":559.8,"late":17.3,"refund_pct":25.5,"cancel_pct":0.0,"comps":{"gm":162.5,"fee":6.41,"disc":44.78,"pick":20.76,"dc":36.69,"ref":17.8},"q_orders":[7218,7358,7516,7603],"q_profit":[49.67,48.41,47.81,49.6],"q_total":[358525,356166,359347,377105],"total_profit":1451145},"leak":{"neg_share":20.2,"neg_n":5994,"neg_sum":-190566,"cancel_n":305,"cancel_sum":-122917,"share_of_profit":23.6,"total_profit":1328227}},"repeat":{"bands":[{"name":"1 order","customers":1295,"orders":1295,"order_share":4.3,"profit":73349,"profit_share":5.5,"ppo":56.6,"disc_po":32.5,"disc_pct":5.9,"ref_po":20.1,"loss_pct":15.4},{"name":"2–3 orders","customers":2149,"orders":5290,"order_share":17.6,"profit":276618,"profit_share":20.8,"ppo":52.3,"disc_po":36.0,"disc_pct":6.4,"ref_po":21.7,"loss_pct":8.7},{"name":"4–6 orders","customers":1850,"orders":8918,"order_share":29.7,"profit":440427,"profit_share":33.2,"ppo":49.4,"disc_po":40.3,"disc_pct":7.2,"ref_po":21.2,"loss_pct":5.7},{"name":"7–10 orders","customers":982,"orders":8065,"order_share":26.9,"profit":331374,"profit_share":24.9,"ppo":41.1,"disc_po":47.9,"disc_pct":8.6,"ref_po":21.1,"loss_pct":6.0},{"name":"11+ orders","customers":483,"orders":6432,"order_share":21.4,"profit":206457,"profit_share":15.5,"ppo":32.1,"disc_po":56.8,"disc_pct":10.1,"ref_po":21.7,"loss_pct":8.7}],"quad":{"quiet":{"customers":2136,"cust_share":31.6,"ppo":81.7,"profit_share":25.1,"loss":0,"disc_po":31.9,"ref_po":8.6},"stars":{"customers":1787,"cust_share":26.4,"ppo":64.2,"profit_share":54.3,"loss":0,"disc_po":41.3,"ref_po":12.8},"low":{"customers":1308,"cust_share":19.4,"ppo":6.5,"profit_share":1.2,"loss":386,"disc_po":40.9,"ref_po":42.2},"thin":{"customers":1528,"cust_share":22.6,"ppo":21.1,"profit_share":19.3,"loss":207,"disc_po":53.2,"ref_po":29.2}},"avg":44.3,"ranges":{"order_count":{"lo":32.1,"hi":56.6,"items":{"1 order":56.6,"2–3 orders":52.3,"4–6 orders":49.4,"7–10 orders":41.1,"11+ orders":32.1}},"membership":{"lo":42.9,"hi":46.6,"items":{"Annual member":46.6,"Monthly member":45.4,"Non-member":42.9}},"channel":{"lo":43.4,"hi":46.0,"items":{"Affiliate":45.4,"Marketplace":44.3,"Organic":43.6,"Paid Social":43.4,"Referral":46.0}},"tier":{"lo":43.7,"hi":44.8,"items":{"Metro":44.8,"Tier 2":43.7}}},"loss":{"customers":593,"share":8.8,"sum":-71786,"busy":101},"buyers":6759},"ops":{"stores":[{"id":"S001","city":"Tier2 F","format":"Standard","model":"Hybrid","riders":35,"inv":91.9,"staff":80.9,"orders":854,"ppo":47.3,"stock":70.1,"refund":26.3,"late":13.2,"cancel":0.8},{"id":"S002","city":"Metro A","format":"Small","model":"Dedicated","riders":15,"inv":93.8,"staff":95.2,"orders":761,"ppo":48.2,"stock":61.7,"refund":23.2,"late":17.9,"cancel":0.8},{"id":"S003","city":"Tier2 D","format":"Standard","model":"Dedicated","riders":37,"inv":89.5,"staff":69.8,"orders":797,"ppo":38.7,"stock":78.0,"refund":28.3,"late":25.5,"cancel":1.5},{"id":"S004","city":"Tier2 F","format":"Standard","model":"Marketplace","riders":45,"inv":92.2,"staff":89.2,"orders":837,"ppo":48.4,"stock":69.4,"refund":27.9,"late":12.7,"cancel":0.4},{"id":"S005","city":"Tier2 E","format":"Large","model":"Marketplace","riders":37,"inv":96.3,"staff":73.2,"orders":835,"ppo":43.9,"stock":52.4,"refund":23.4,"late":21.8,"cancel":1.1},{"id":"S006","city":"Tier2 E","format":"Standard","model":"Hybrid","riders":30,"inv":97.9,"staff":99.3,"orders":845,"ppo":49.0,"stock":37.9,"refund":15.6,"late":10.9,"cancel":1.4},{"id":"S007","city":"Tier2 E","format":"Large","model":"Hybrid","riders":30,"inv":91.1,"staff":83.1,"orders":856,"ppo":39.6,"stock":73.3,"refund":29.0,"late":19.1,"cancel":0.8},{"id":"S008","city":"Metro C","format":"Large","model":"Hybrid","riders":22,"inv":90.9,"staff":96.2,"orders":839,"ppo":39.1,"stock":73.7,"refund":28.2,"late":17.2,"cancel":0.8},{"id":"S009","city":"Metro A","format":"Small","model":"Dedicated","riders":32,"inv":94.4,"staff":83.2,"orders":831,"ppo":46.3,"stock":57.5,"refund":23.5,"late":16.5,"cancel":0.8},{"id":"S010","city":"Tier2 D","format":"Standard","model":"Hybrid","riders":41,"inv":95.3,"staff":79.0,"orders":825,"ppo":44.3,"stock":54.1,"refund":21.4,"late":15.8,"cancel":1.6},{"id":"S011","city":"Tier2 E","format":"Small","model":"Dedicated","riders":17,"inv":84.5,"staff":76.5,"orders":829,"ppo":35.2,"stock":88.2,"refund":33.3,"late":30.7,"cancel":1.0},{"id":"S012","city":"Tier2 D","format":"Standard","model":"Hybrid","riders":16,"inv":88.8,"staff":76.9,"orders":860,"ppo":33.3,"stock":78.9,"refund":32.2,"late":30.2,"cancel":1.7},{"id":"S013","city":"Tier2 E","format":"Standard","model":"Marketplace","riders":34,"inv":91.3,"staff":86.6,"orders":840,"ppo":45.9,"stock":72.5,"refund":28.4,"late":13.1,"cancel":1.2},{"id":"S014","city":"Tier2 D","format":"Standard","model":"Hybrid","riders":24,"inv":98.1,"staff":91.2,"orders":812,"ppo":53.4,"stock":36.7,"refund":13.9,"late":13.6,"cancel":0.7},{"id":"S015","city":"Metro B","format":"Standard","model":"Dedicated","riders":48,"inv":93.4,"staff":91.2,"orders":873,"ppo":47.1,"stock":64.4,"refund":22.5,"late":15.7,"cancel":0.9},{"id":"S016","city":"Tier2 D","format":"Standard","model":"Dedicated","riders":24,"inv":89.0,"staff":97.3,"orders":834,"ppo":39.5,"stock":77.9,"refund":30.1,"late":13.7,"cancel":0.8},{"id":"S017","city":"Tier2 E","format":"Standard","model":"Hybrid","riders":39,"inv":92.1,"staff":97.8,"orders":849,"ppo":41.4,"stock":69.8,"refund":27.6,"late":13.8,"cancel":0.9},{"id":"S018","city":"Metro A","format":"Standard","model":"Hybrid","riders":30,"inv":93.4,"staff":71.5,"orders":854,"ppo":43.2,"stock":63.2,"refund":24.9,"late":19.7,"cancel":1.4},{"id":"S019","city":"Metro C","format":"Standard","model":"Hybrid","riders":49,"inv":84.4,"staff":68.4,"orders":826,"ppo":43.0,"stock":89.4,"refund":36.3,"late":18.3,"cancel":0.6},{"id":"S020","city":"Tier2 D","format":"Standard","model":"Marketplace","riders":39,"inv":93.3,"staff":87.8,"orders":839,"ppo":44.0,"stock":63.7,"refund":24.2,"late":17.0,"cancel":1.1},{"id":"S021","city":"Metro A","format":"Small","model":"Dedicated","riders":20,"inv":93.3,"staff":98.7,"orders":860,"ppo":43.3,"stock":65.0,"refund":26.2,"late":13.4,"cancel":1.7},{"id":"S022","city":"Metro C","format":"Large","model":"Hybrid","riders":23,"inv":98.8,"staff":90.8,"orders":875,"ppo":59.4,"stock":27.6,"refund":9.6,"late":13.9,"cancel":0.8},{"id":"S023","city":"Tier2 E","format":"Large","model":"Hybrid","riders":54,"inv":92.3,"staff":97.1,"orders":805,"ppo":42.9,"stock":67.4,"refund":27.9,"late":13.5,"cancel":0.9},{"id":"S024","city":"Metro A","format":"Large","model":"Hybrid","riders":40,"inv":97.0,"staff":89.3,"orders":840,"ppo":49.6,"stock":43.7,"refund":17.7,"late":11.8,"cancel":1.2},{"id":"S025","city":"Tier2 E","format":"Standard","model":"Marketplace","riders":14,"inv":96.0,"staff":81.2,"orders":843,"ppo":45.1,"stock":51.4,"refund":19.5,"late":25.8,"cancel":1.3},{"id":"S026","city":"Metro A","format":"Standard","model":"Hybrid","riders":18,"inv":89.7,"staff":75.6,"orders":850,"ppo":40.1,"stock":77.3,"refund":31.4,"late":24.8,"cancel":1.2},{"id":"S027","city":"Metro A","format":"Standard","model":"Hybrid","riders":26,"inv":88.7,"staff":78.2,"orders":775,"ppo":35.3,"stock":79.7,"refund":32.5,"late":23.8,"cancel":1.3},{"id":"S028","city":"Tier2 D","format":"Standard","model":"Dedicated","riders":33,"inv":91.1,"staff":81.0,"orders":874,"ppo":43.9,"stock":73.1,"refund":27.0,"late":19.5,"cancel":0.3},{"id":"S029","city":"Metro B","format":"Small","model":"Hybrid","riders":25,"inv":96.0,"staff":90.7,"orders":799,"ppo":43.5,"stock":51.1,"refund":21.3,"late":14.0,"cancel":1.8},{"id":"S030","city":"Metro A","format":"Small","model":"Dedicated","riders":26,"inv":96.0,"staff":95.4,"orders":883,"ppo":52.3,"stock":51.9,"refund":21.6,"late":9.8,"cancel":0.8},{"id":"S031","city":"Tier2 E","format":"Large","model":"Dedicated","riders":39,"inv":93.7,"staff":82.3,"orders":801,"ppo":47.8,"stock":61.1,"refund":24.4,"late":19.5,"cancel":0.6},{"id":"S032","city":"Tier2 F","format":"Large","model":"Marketplace","riders":52,"inv":94.3,"staff":78.7,"orders":862,"ppo":45.0,"stock":62.1,"refund":25.6,"late":17.3,"cancel":0.7},{"id":"S033","city":"Metro A","format":"Small","model":"Hybrid","riders":52,"inv":87.5,"staff":71.7,"orders":864,"ppo":40.7,"stock":81.2,"refund":33.3,"late":17.4,"cancel":1.0},{"id":"S034","city":"Metro A","format":"Small","model":"Hybrid","riders":52,"inv":97.0,"staff":74.5,"orders":764,"ppo":51.8,"stock":46.2,"refund":17.3,"late":18.4,"cancel":0.9},{"id":"S035","city":"Metro B","format":"Standard","model":"Marketplace","riders":41,"inv":90.0,"staff":97.0,"orders":830,"ppo":39.6,"stock":75.2,"refund":28.7,"late":13.1,"cancel":0.8},{"id":"S036","city":"Metro C","format":"Standard","model":"Marketplace","riders":38,"inv":89.0,"staff":88.3,"orders":779,"ppo":42.3,"stock":79.4,"refund":32.6,"late":10.2,"cancel":0.8}],"heat":[{"promise":20,"cells":[{"late":22.3,"n":2716,"late_n":606},{"late":38.6,"n":2197,"late_n":848},{"late":55.8,"n":1539,"late_n":858},{"late":72.5,"n":920,"late_n":667}]},{"promise":25,"cells":[{"late":5.4,"n":2716,"late_n":148},{"late":14.3,"n":2117,"late_n":303},{"late":26.5,"n":1629,"late_n":432},{"late":47.2,"n":918,"late_n":433}]},{"promise":30,"cells":[{"late":1.1,"n":5472,"late_n":61},{"late":3.0,"n":4287,"late_n":129},{"late":8.0,"n":3237,"late_n":260},{"late":19.8,"n":1947,"late_n":385}]}],"hours":[{"hour":7,"late":11.7,"n":598,"peak":0},{"hour":8,"late":11.8,"n":844,"peak":0},{"hour":9,"late":11.4,"n":1089,"peak":0},{"hour":10,"late":12.4,"n":1304,"peak":0},{"hour":11,"late":11.0,"n":1570,"peak":0},{"hour":12,"late":27.3,"n":1884,"peak":1},{"hour":13,"late":26.9,"n":1641,"peak":1},{"hour":14,"late":10.7,"n":1389,"peak":0},{"hour":15,"late":11.6,"n":1529,"peak":0},{"hour":16,"late":11.4,"n":2194,"peak":0},{"hour":17,"late":11.2,"n":2698,"peak":0},{"hour":18,"late":12.3,"n":3317,"peak":0},{"hour":19,"late":26.8,"n":3047,"peak":1},{"hour":20,"late":27.3,"n":2484,"peak":1},{"hour":21,"late":27.2,"n":1895,"peak":1},{"hour":22,"late":10.4,"n":1355,"peak":0},{"hour":23,"late":12.6,"n":857,"peak":0}],"stock":{"share":64.6,"refund_among":39.4,"refund_total":528578,"refund_share_profit":39.8,"ppo_with":37.3,"ppo_without":69.9},"groups":{"low":{"stores":10,"ppo":38.8,"orders":8244},"mid":{"stores":16,"ppo":44.6},"hi":{"stores":10,"ppo":49.3}},"peak":{"peak_late":27.1,"off_late":11.5,"peak_order_share":36.9,"peak_late_share":57.9},"weather":{"Heat":21.3,"Normal":11.8,"Rain":32.6},"city_range":{"lo":42.4,"hi":46.9},"avg_delivery":18.9,"late_by_promise":{"20":40.4,"25":17.8,"30":5.6}},"promo":{"by_type":[{"label":"All offers","sub":"","nT":5168,"nC":2832,"orders":{"ctrl":1.21,"treat":1.37,"diff":0.158,"lo":0.095,"hi":0.22},"profit":{"ctrl":78.82,"treat":66.35,"diff":-12.461,"lo":-17.073,"hi":-7.849},"redeem":31.8},{"label":"Percentage discount","sub":"","nT":2036,"nC":2832,"orders":{"ctrl":1.21,"treat":1.35,"diff":0.143,"lo":0.067,"hi":0.22},"profit":{"ctrl":78.82,"treat":64.74,"diff":-14.074,"lo":-19.836,"hi":-8.313},"redeem":32.0},{"label":"Fixed discount","sub":"","nT":1573,"nC":2832,"orders":{"ctrl":1.21,"treat":1.38,"diff":0.174,"lo":0.091,"hi":0.257},"profit":{"ctrl":78.82,"treat":58.17,"diff":-20.645,"lo":-26.894,"hi":-14.395},"redeem":31.7},{"label":"Free delivery","sub":"","nT":1559,"nC":2832,"orders":{"ctrl":1.21,"treat":1.37,"diff":0.16,"lo":0.078,"hi":0.243},"profit":{"ctrl":78.82,"treat":76.72,"diff":-2.097,"lo":-8.156,"hi":3.962},"redeem":31.8}],"by_group":[{"label":"Active customers","sub":"Ordered in the last 90 days and has 3+ orders","nT":2097,"nC":1163,"orders":{"ctrl":1.93,"treat":1.97,"diff":0.035,"lo":-0.075,"hi":0.145},"profit":{"ctrl":125.83,"treat":98.62,"diff":-27.214,"lo":-35.656,"hi":-18.772},"redeem":40.9},{"label":"Lapsed or light customers","sub":"No order in 90+ days, or 2 or fewer orders","nT":3071,"nC":1669,"orders":{"ctrl":0.7,"treat":0.96,"diff":0.252,"lo":0.193,"hi":0.31},"profit":{"ctrl":46.05,"treat":44.32,"diff":-1.729,"lo":-6.12,"hi":2.661},"redeem":25.6},{"label":"Lapsed or light + free delivery","sub":"","nT":925,"nC":1669,"orders":{"ctrl":0.7,"treat":0.94,"diff":0.236,"lo":0.158,"hi":0.314},"profit":{"ctrl":46.05,"treat":52.07,"diff":6.021,"lo":0.142,"hi":11.9},"redeem":26.4},{"label":"Lapsed or light + percentage discount","sub":"","nT":1194,"nC":1669,"orders":{"ctrl":0.7,"treat":0.93,"diff":0.223,"lo":0.15,"hi":0.297},"profit":{"ctrl":46.05,"treat":41.4,"diff":-4.654,"lo":-10.257,"hi":0.949},"redeem":25.3},{"label":"Lapsed or light + fixed discount","sub":"","nT":952,"nC":1669,"orders":{"ctrl":0.7,"treat":1.01,"diff":0.303,"lo":0.223,"hi":0.383},"profit":{"ctrl":46.05,"treat":40.46,"diff":-5.592,"lo":-11.952,"hi":0.768},"redeem":25.2}],"counts":{"treat":5168,"ctrl":2832,"redeem_all":31.8,"active_share":40.8,"active_redeem":40.9,"light_redeem":25.6}},"rec":{"per1000_all_profit":-12461,"per1000_all_orders":158,"per1000_tgt_profit":3567,"per1000_tgt_orders":140,"share_target":59.2,"inv_mid":47854,"inv_hi":86841,"heavy":{"customers":1465,"cust_share":21.7,"order_share":48.3,"disc":51.9,"disc46":40.3,"per5":72485,"per5_pct":5.5,"cap40":171877}},"ctx":{"orders":30000,"customers":6759,"stores":36,"cities":6,"basket_total":16791762,"profit":1328227,"margin_pct":7.9,"test":8000,"cust_rows":8000}};
+
+/* ---------- helpers ---------- */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const nf = n => Number(n).toLocaleString('en-IN');
+const inr = (n, d=0) => '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits:d, maximumFractionDigits:d});
+const sgn = (n, d=1, cur=true) => (n < 0 ? '−' : '+') + (cur ? '₹' : '') + Math.abs(n).toLocaleString('en-IN', {minimumFractionDigits:d, maximumFractionDigits:d});
+const lakh = n => '₹' + (Math.abs(n) / 1e5).toFixed(1) + ' lakh';
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const tip = h => `data-tip="${esc(h)}"`;
+const pct = (n, d=0) => n.toFixed(d) + '%';
+const svg = (w, h, inner, label) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(label)}">${inner}</svg>`;
+const wOf = el => Math.max(300, Math.floor(el.clientWidth || el.getBoundingClientRect().width || 600));
+
+const state = { page:'context', mode:'all', band:4, store:null, ov:'heat', pm:'type', tbl:0 };
+
+/* ---------- pages & nav ---------- */
+const PAGES = [
+  ['context','Context'], ['health','Business Health'], ['repeat','Profitable Repeat Behavior'],
+  ['ops','Operational Priorities'], ['promo','Promotion'], ['rec','Recommendation'], ['how','How we got here']
+];
+function buildNav(){
+  $('#nav').innerHTML = PAGES.map((p,i)=>`<button type="button" class="tab" data-go="${p[0]}"><span class="n">${i+1}</span>${p[1]}</button>`).join('');
+  $('#dots').innerHTML = PAGES.map(()=>'<i></i>').join('');
+}
+function go(id){
+  if(!PAGES.find(p=>p[0]===id)) id='context';
+  state.page = id;
+  PAGES.forEach(p => { $('#p-'+p[0]).hidden = p[0] !== id; });
+  $$('.tab').forEach(t => t.setAttribute('aria-current', t.dataset.go===id ? 'page' : 'false'));
+  const i = PAGES.findIndex(p=>p[0]===id);
+  $$('#dots i').forEach((d,k)=>d.classList.toggle('on', k===i));
+  $('#prev').disabled = i===0; $('#next').disabled = i===PAGES.length-1;
+  $('#prevL').textContent = i>0 ? PAGES[i-1][1] : ''; $('#nextL').textContent = i<PAGES.length-1 ? PAGES[i+1][1] : '';
+  try{ history.replaceState(null,'','#'+id); }catch(e){ /* hash is optional */ }
+  hideTip();
+  render();
+  window.scrollTo(0,0);
+}
+function render(){
+  const f = { context:rContext, health:rHealth, repeat:rRepeat, ops:rOps, promo:rPromo, rec:rRec, how:rHow }[state.page];
+  f();
+}
+
+/* ---------- tooltip ---------- */
+const tipEl = $('#tip');
+function showTip(t, x, y){
+  tipEl.innerHTML = t.getAttribute('data-tip');
+  tipEl.classList.add('on');
+  const r = tipEl.getBoundingClientRect();
+  let left = x + 14, top = y + 14;
+  if(left + r.width > window.innerWidth - 8) left = x - r.width - 14;
+  if(top + r.height > window.innerHeight - 8) top = y - r.height - 14;
+  tipEl.style.left = Math.max(8,left) + 'px'; tipEl.style.top = Math.max(8,top) + 'px';
+}
+function hideTip(){ tipEl.classList.remove('on'); }
+document.addEventListener('mousemove', e => {
+  const t = e.target.closest ? e.target.closest('[data-tip]') : null;
+  if(t) showTip(t, e.clientX, e.clientY); else hideTip();
+});
+document.addEventListener('focusin', e => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if(t){ const r = t.getBoundingClientRect(); showTip(t, r.left + r.width/2, r.top + r.height/2); }
+});
+document.addEventListener('focusout', hideTip);
+
+/* ---------- global clicks ---------- */
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if(g){ go(g.dataset.go); return; }
+  const s = e.target.closest('[data-seg]');
+  if(s){
+    const k = s.dataset.seg, v = s.dataset.val;
+    if(k==='mode') state.mode = v; if(k==='ov') state.ov = v; if(k==='pm') state.pm = v;
+    $$(`[data-seg="${k}"]`).forEach(b => b.setAttribute('aria-pressed', b.dataset.val===v ? 'true':'false'));
+    render(); return;
+  }
+  const b = e.target.closest('[data-band]'); if(b){ state.band = +b.dataset.band; rRepeat(); return; }
+  const st = e.target.closest('[data-store]'); if(st){ state.store = st.dataset.store; rOps(); return; }
+  const tb = e.target.closest('[data-tbl]'); if(tb){ state.tbl = +tb.dataset.tbl; rContext(); return; }
+});
+document.addEventListener('keydown', e => {
+  if(e.target.matches && e.target.matches('input,textarea,select')) return;
+  const i = PAGES.findIndex(p=>p[0]===state.page);
+  if(e.key==='ArrowRight' && i<PAGES.length-1) go(PAGES[i+1][0]);
+  if(e.key==='ArrowLeft' && i>0) go(PAGES[i-1][0]);
+  if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('[data-band],[data-store]')){ e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click',{bubbles:true})); }
+});
+$('#prev').addEventListener('click', ()=>{ const i=PAGES.findIndex(p=>p[0]===state.page); if(i>0) go(PAGES[i-1][0]); });
+$('#next').addEventListener('click', ()=>{ const i=PAGES.findIndex(p=>p[0]===state.page); if(i<PAGES.length-1) go(PAGES[i+1][0]); });
+let rz; window.addEventListener('resize', ()=>{ clearTimeout(rz); rz = setTimeout(render, 120); });
+
+/* ---------- 1 context ---------- */
+const TABLES = [
+  {n:'Orders', rows:()=>nf(D.ctx.orders), use:'Pages 2–4', d:'One row per order placed in 2025. This is where profit per order is measured.',
+   f:['order_id','customer_id*','store_id*','basket_value_inr','discount_inr','delivery_fee_inr','gross_margin_inr','picking_cost_inr','delivery_cost_inr','refund_inr','contribution_margin_inr','promised_minutes','delivery_distance_km','stockout_item_count','late_delivery_flag']},
+  {n:'Customers', rows:()=>nf(D.ctx.cust_rows), use:'Pages 3, 5–6', d:'One row per customer. Order count, discount depth and “active” groups come from here.',
+   f:['customer_id*','acquisition_channel','city_tier','membership_status','historical_orders_12m','historical_margin_12m','days_since_last_order','signup_date','app_sessions_30d']},
+  {n:'Stores', rows:()=>nf(D.ctx.stores), use:'Page 4', d:'One row per store. Inventory accuracy and delivery set-up explain the store gaps.',
+   f:['store_id*','city','store_format','delivery_partner_model','average_active_riders','inventory_accuracy_pct','staffing_fill_rate_pct','catchment_density']},
+  {n:'Offer test', rows:()=>nf(D.ctx.test), use:'Pages 5–6', d:'One row per customer in a random Q1 2026 test: who got an offer, which one, and the orders and profit afterwards.',
+   f:['customer_id*','assignment_group','offer_type','offer_value_inr','offer_redeemed_flag','post_campaign_orders','post_campaign_margin_inr']}
+];
+function rContext(){
+  const c = D.ctx;
+  $('#ctxTiles').innerHTML = [
+    [nf(c.orders),'orders in 2025',''], [nf(c.customers),'customers who ordered',''], [c.stores,'stores in '+c.cities+' cities',''],
+    ['₹'+(c.basket_total/1e7).toFixed(2)+' cr','basket value sold',''], ['₹'+(c.profit/1e5).toFixed(1)+' lakh','profit kept ('+c.margin_pct+'% of basket)','good'], [nf(c.test),'customers in the Q1 2026 offer test','']
+  ].map(t=>`<div class="tile"><span class="v ${t[2]}">${t[0]}</span><span class="l">${t[1]}</span></div>`).join('');
+  const box = (i,pos) => { const T = TABLES[i]; return `<button type="button" class="dmb" style="${pos}" data-tbl="${i}" aria-pressed="${i===state.tbl}"><b>${T.n}</b><span class="r">${T.rows()} rows</span><span class="u">${T.use}</span></button>`; };
+  const lk = (txt,pos,v) => `<div class="lk${v?' v':''}" style="${pos}"><span>${txt}</span><i></i></div>`;
+  const S = TABLES[state.tbl];
+  $('#dm').innerHTML =
+    box(1,'grid-column:1;grid-row:1') + lk('customer_id','grid-column:2;grid-row:1') + box(0,'grid-column:3;grid-row:1') + lk('store_id','grid-column:4;grid-row:1').replace('class="lk"','class="lk rev"') + box(2,'grid-column:5;grid-row:1') +
+    lk('customer_id','grid-column:1;grid-row:2',true) + box(3,'grid-column:1;grid-row:3') +
+    `<div class="dmnote"><span><b>2025 history</b> (Orders, Customers, Stores) answers pages 2–4.</span><span><b>Q1 2026 test</b> (Offer test) answers pages 5–6.</span><span>Click a table to see its columns.</span></div>` +
+    `<div class="dmd"><h3>${S.n}: ${S.rows()} rows</h3><p>${S.d}</p><div class="fld">${S.f.map(x=>x.endsWith('*')?`<span class="key">${x.slice(0,-1)} (join key)</span>`:`<span>${x}</span>`).join('')}</div></div>`;
+}
+
+/* ---------- 2 health ---------- */
+function rHealth(){
+  const H = D.health[state.mode], A = D.health.all;
+  const delivered = state.mode==='delivered';
+  $('#hTiles').innerHTML = [
+    [nf(H.orders), delivered ? 'delivered orders (305 cancelled left out)' : 'orders in 2025', ''],
+    [inr(H.profit_per_order), 'profit per order ('+H.margin_pct+'% of basket)', 'good'],
+    [pct(H.late), 'deliveries arrive late', 'bad'],
+    [pct(H.refund_pct), 'orders get a refund', 'bad'],
+    [delivered ? '—' : pct(H.cancel_pct,1), delivered ? 'cancellations excluded in this view' : 'orders cancelled', delivered ? '' : 'bad']
+  ].map(t=>`<div class="tile"><span class="v ${t[2]}">${t[0]}</span><span class="l">${t[1]}</span></div>`).join('');
+  drawWaterfall(H);
+  drawIndex(H);
+  const L = D.health.leak;
+  $('#hBand').innerHTML = `<b>Where profit leaks:</b> ${pct(L.neg_share)} of delivered orders lose money (−${lakh(L.neg_sum).replace('₹','₹')}), and ${nf(L.cancel_n)} cancelled orders lose another ${lakh(L.cancel_sum)}. Together that is ${pct(L.share_of_profit)} of the ${lakh(L.total_profit)} profit kept.`;
+}
+function drawWaterfall(H){
+  const el = $('#wf'), w = wOf(el), c = H.comps;
+  const narrow = w < 520, labelW = narrow ? 116 : 150, pad = 70;
+  const rows = [
+    ['Gross margin', c.gm, 'up', 'What the products earn before promos and costs.'],
+    ['Delivery fee', c.fee, 'up', 'Fee paid by the customer (free on most orders).'],
+    ['Discount', -c.disc, 'down', 'Discount given on the order.'],
+    ['Picking cost', -c.pick, 'down', 'In-store picking and packing.'],
+    ['Delivery cost', -c.dc, 'down', 'Last-mile delivery.'],
+    ['Refund', -c.ref, 'down', 'Refunds issued to customers.'],
+    ['Profit per order', H.profit_per_order, 'total', 'What is left: contribution margin.']
+  ];
+  const maxCum = c.gm + c.fee, barW = w - labelW - pad, sc = barW / maxCum, rh = 42;
+  let run = 0, out = '';
+  rows.forEach((r,i) => {
+    const y = i*rh + 6; let s, e;
+    if(r[2]==='total'){ s = 0; e = r[1]; }
+    else if(i===0){ s = 0; e = r[1]; run = e; }
+    else { s = run; e = run + r[1]; run = e; }
+    const x1 = labelW + Math.min(s,e)*sc, bw = Math.max(2, Math.abs(e-s)*sc);
+    const cls = r[2]==='up' ? 'var(--blue)' : r[2]==='down' ? 'var(--orange)' : 'var(--ink)';
+    const tcl = r[2]==='up' ? 'tbl' : r[2]==='down' ? 'to' : 'tb';
+    const val = r[2]==='total' ? inr(r[1],1) : sgn(r[1],1,false);
+    out += `<text class="${r[2]==='total'?'tb':'t'}" x="0" y="${y+17}" ${narrow?'style="font-size:12.5px"':''}>${r[0]}</text>`;
+    out += `<rect class="mk" x="${x1.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="26" rx="4" fill="${cls}" ${tip('<b>'+r[0]+'</b><br>'+val+' per order<br>'+r[3])} tabindex="0"/>`;
+    out += `<text class="${tcl}" x="${(x1+bw+8).toFixed(1)}" y="${y+18}">${val}</text>`;
+  });
+  el.innerHTML = svg(w, rows.length*rh + 6, out, 'Waterfall of average money per order from gross margin to profit');
+  $('#wfNote').innerHTML = `Discounts and refunds take <b>${inr(c.disc + c.ref)}</b> of the <b>${inr(c.gm + c.fee)}</b> earned before costs.`;
+}
+function drawIndex(H){
+  const el = $('#ix'), w = wOf(el), h = 290, m = {l:40, r:22, t:14, b:34};
+  const io = H.q_orders.map(v => v / H.q_orders[0] * 100), ip = H.q_profit.map(v => v / H.q_profit[0] * 100);
+  const lo = 97, hi = 107, X = i => m.l + i * (w-m.l-m.r) / 3, Y = v => m.t + (hi - v) * (h-m.t-m.b) / (hi-lo);
+  let o = '';
+  [98,100,102,104,106].forEach(v => { o += `<line class="${v===100?'ax':'gl'}" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}" ${v===100?'stroke-dasharray="5 4"':''}/><text class="tm" x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${v}</text>`; });
+  ['Q1','Q2','Q3','Q4'].forEach((q,i) => { o += `<text class="t" x="${X(i)}" y="${h-10}" text-anchor="middle">${q}</text>`; });
+  const line = (arr, col) => `<polyline fill="none" stroke="${col}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${arr.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}"/>`;
+  o += line(io,'var(--blue)') + line(ip,'var(--orange)');
+  const dot = (arr, col, key) => arr.map((v,i) => `<circle cx="${X(i)}" cy="${Y(v)}" r="5" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`).join('');
+  o += dot(io,'var(--blue)') + dot(ip,'var(--orange)');
+  for(let i=0;i<4;i++){
+    const t = `<b>Q${i+1}</b><br>Orders: ${nf(H.q_orders[i])} (index ${io[i].toFixed(1)})<br>Profit per order: ${inr(H.q_profit[i],1)} (index ${ip[i].toFixed(1)})<br>Profit: ${lakh(H.q_total[i])}`;
+    o += `<rect class="hit" x="${X(i)-24}" y="${m.t}" width="48" height="${h-m.t-m.b}" ${tip(t)} tabindex="0"/>`;
+  }
+  o += `<text class="tbl" x="${X(3)}" y="${Y(io[3])-12}" text-anchor="end">${io[3].toFixed(1)}</text><text class="to" x="${X(3)}" y="${Y(ip[3])+22}" text-anchor="end">${ip[3].toFixed(1)}</text>`;
+  el.innerHTML = svg(w,h,o,'Line chart of quarterly orders and profit per order indexed to Q1');
+  const dO = (H.q_orders[3]/H.q_orders[0]-1)*100, dP = (H.q_profit[3]/H.q_profit[0]-1)*100;
+  $('#ixLegend').innerHTML = `<span><i style="background:var(--blue)"></i>Orders ${dO>=0?'+':'−'}${Math.abs(dO).toFixed(1)}% (Q1 to Q4)</span><span><i style="background:var(--orange)"></i>Profit per order ${dP>=0?'+':'−'}${Math.abs(dP).toFixed(1)}%</span>`;
+}
+
+/* ---------- 3 repeat ---------- */
+function rRepeat(){
+  const R = D.repeat;
+  $('#avgPpo').textContent = inr(R.avg,1) + ' per order';
+  drawBands(R);
+  const q = R.quad;
+  const cell = (key, name, cls) => {
+    const x = q[key];
+    return `<div class="qc ${cls}" ${tip('<b>'+name+'</b><br>'+nf(x.customers)+' customers ('+pct(x.cust_share)+')<br>Profit per order '+inr(x.ppo)+'<br>Discount per order '+inr(x.disc_po,1)+', refund per order '+inr(x.ref_po,1)+'<br>'+nf(x.loss)+' customers lose money')} tabindex="0">
+      <h3>${name}</h3><span class="big">${inr(x.ppo)}<span class="sm"> per order</span></span><span class="sm">${nf(x.customers)} customers (${pct(x.cust_share)})</span>
+      <span class="sm"><b>${pct(x.profit_share)}</b> of profit</span><div class="pbar"><i style="width:${Math.max(1,x.profit_share)}%"></i></div></div>`;
+  };
+  $('#quad').innerHTML = `<span></span><span class="qh">1–3 orders</span><span class="qh">4+ orders</span>
+    <span class="qr">High profit</span>${cell('quiet','Quiet earners','hi')}${cell('stars','Stars','hi')}
+    <span class="qr">Low profit</span>${cell('low','Low value','lo')}${cell('thin','Busy but thin','lo')}`;
+  const L = R.loss;
+  $('#rBand').innerHTML = `<div><b>Who loses money:</b> ${nf(L.customers)} customers (${pct(L.share)}) lose ${lakh(L.sum)} in total, and ${L.busy} of them order 7+ times. Who the customer is barely matters: membership, channel and city tier all stay at ₹43–47 per order. Order count and discount depth do.</div>`;
+}
+function drawBands(R){
+  const el = $('#bands'), w = wOf(el), h = 420, m = {l:42, r:6, t:26, b:62};
+  const Y = v => m.t + (60 - v) * (h - m.t - m.b) / 60, slot = (w - m.l - m.r) / R.bands.length, bw = Math.min(78, slot*0.64);
+  let o = '';
+  [0,20,40,60].forEach(v => { o += `<line class="${v===0?'ax':'gl'}" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="tm" x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">₹${v}</text>`; });
+  R.bands.forEach((b,i) => {
+    const cx = m.l + slot*i + slot/2, sel = i === state.band, top = Y(b.ppo);
+    const t = `<b>${b.name}</b><br>Profit per order ${inr(b.ppo,1)}<br>Discount ${pct(b.disc_pct,1)} of basket<br>${nf(b.customers)} customers`;
+    o += `<g class="clickable" data-band="${i}" tabindex="0" role="button" aria-label="${esc(b.name)}" ${tip(t)}>
+      <rect x="${cx-slot/2+2}" y="${m.t-18}" width="${slot-4}" height="${h-m.t+18}" fill="transparent"/>
+      <rect x="${(cx-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw}" height="${(Y(0)-top).toFixed(1)}" rx="5" fill="${sel?'var(--orange)':'var(--blue)'}"/>
+      <text class="${sel?'to':'tb'}" x="${cx}" y="${(top-7).toFixed(1)}" text-anchor="middle" style="font-size:15px">${inr(b.ppo,1)}</text>
+      <text class="t" x="${cx}" y="${Y(0)+20}" text-anchor="middle">${b.name}</text>
+      <text class="to" x="${cx}" y="${Y(0)+40}" text-anchor="middle" style="font-size:12.5px">Disc. ${pct(b.disc_pct,1)}</text></g>`;
+  });
+  el.innerHTML = svg(w,h,o,'Bar chart of profit per order by number of orders in 2025');
+}
+function drawRange(R){
+  const el = $('#rng'), w = wOf(el), narrow = w < 520, labelW = narrow ? 92 : 128, pad = narrow ? 88 : 104, rh = 38, h = 4*rh + 34;
+  const rows = [['Order count', R.ranges.order_count, true], ['Membership', R.ranges.membership], ['Acquisition channel', R.ranges.channel], ['City tier', R.ranges.tier]];
+  const X = v => labelW + (v - 30) * (w - labelW - pad) / 30;
+  let o = '';
+  [30,40,50,60].forEach(v => { o += `<line class="gl" x1="${X(v)}" x2="${X(v)}" y1="0" y2="${4*rh}"/><text class="tm" x="${X(v)}" y="${4*rh+20}" text-anchor="middle">₹${v}</text>`; });
+  rows.forEach((r,i) => {
+    const y = i*rh + 8, rg = r[1];
+    const items = Object.entries(rg.items).map(([k,v]) => k + ': ' + inr(v,1)).join('<br>');
+    o += `<text class="${r[2]?'tb':'t'}" x="0" y="${y+14}" ${narrow?'style="font-size:12.5px"':''}>${r[0]}</text>`;
+    o += `<rect class="mk" x="${X(rg.lo).toFixed(1)}" y="${y}" width="${Math.max(6, X(rg.hi)-X(rg.lo)).toFixed(1)}" height="20" rx="10" fill="${r[2]?'var(--orange)':'var(--blue)'}" ${tip('<b>'+r[0]+'</b><br>'+items)} tabindex="0"/>`;
+    o += `<text class="${r[2]?'to':'tbl'}" x="${(X(rg.hi)+8).toFixed(1)}" y="${y+15}">${narrow?'':'₹'}${rg.lo.toFixed(0)}–${rg.hi.toFixed(0)}</text>`;
+  });
+  el.innerHTML = svg(w,h,o,'Range of profit per order by customer attribute');
+}
+
+/* ---------- 4 ops ---------- */
+function rOps(){
+  const O = D.ops, s = O.stock, g = O.groups;
+  if(!state.store){ state.store = O.stores.slice().sort((a,b)=>a.ppo-b.ppo)[0].id; }
+  $('#oTiles').innerHTML = [
+    [pct(s.share),'of delivered orders have a stock-out','bad'],
+    [lakh(s.refund_total),'in refunds, all from stock-out orders ('+pct(s.refund_share_profit)+' of profit)','bad'],
+    [inr(s.ppo_with)+' vs '+inr(s.ppo_without),'profit per order with vs without a stock-out',''],
+    [inr(g.low.ppo)+' vs '+inr(g.hi.ppo),'profit per order at weak stores (90% accuracy or below) vs best (above 95%)','']
+  ].map(t=>`<div class="tile"><span class="v ${t[2]}" style="${t[0].length>12?'font-size:24px':''}">${t[0]}</span><span class="l">${t[1]}</span></div>`).join('');
+  drawScatter(O);
+  const st = O.stores.find(x=>x.id===state.store);
+  $('#stHead').innerHTML = `${st.id} · ${st.city} · ${st.format} store · ${st.model} delivery`;
+  $('#stStrip').innerHTML = [
+    [pct(st.inv,1),'inventory accuracy'], [pct(st.staff,1),'staffing fill rate'], [inr(st.ppo,1),'profit per order'],
+    [pct(st.stock),'orders with a stock-out'], [pct(st.refund),'orders refunded'], [pct(st.late),'deliveries late']
+  ].map(t=>`<div class="mini"><b>${t[0]}</b><span>${t[1]}</span></div>`).join('');
+  if(state.ov==='heat') drawHeat(O); else drawHours(O);
+}
+function drawScatter(O){
+  const el = $('#sc'), w = wOf(el), h = 290, m = {l:46, r:14, t:12, b:46};
+  const X = v => m.l + (v-84) * (w-m.l-m.r) / 15, Y = v => m.t + (62-v) * (h-m.t-m.b) / 32;
+  let o = '';
+  [30,40,50,60].forEach(v => { o += `<line class="${v===30?'ax':'gl'}" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="tm" x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">₹${v}</text>`; });
+  [85,90,95].forEach(v => { o += `<text class="tm" x="${X(v)}" y="${h-m.b+18}" text-anchor="middle">${v}%</text>`; });
+  o += `<line x1="${X(90)}" x2="${X(90)}" y1="${m.t}" y2="${Y(30)}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  o += `<text class="t" x="${(m.l+w-m.r)/2}" y="${h-6}" text-anchor="middle">Inventory accuracy of the store</text>`;
+  const list = O.stores.slice().sort((a,b)=> (a.id===state.store) - (b.id===state.store));
+  list.forEach(s => {
+    const low = s.inv <= 90, sel = s.id === state.store;
+    const t = `<b>${s.id}</b> · ${s.city}<br>Inventory accuracy ${s.inv}%<br>Profit per order ${inr(s.ppo,1)}<br>Stock-outs on ${pct(s.stock)} of orders`;
+    o += `<g class="clickable" data-store="${s.id}" tabindex="0" role="button" aria-label="Store ${s.id}" ${tip(t)}><circle class="hit" cx="${X(s.inv).toFixed(1)}" cy="${Y(s.ppo).toFixed(1)}" r="13"/>
+      <circle cx="${X(s.inv).toFixed(1)}" cy="${Y(s.ppo).toFixed(1)}" r="${sel?9:7}" fill="${low?'var(--orange)':'var(--blue)'}" stroke="${sel?'var(--ink)':'var(--surface)'}" stroke-width="${sel?3:2}"/></g>`;
+  });
+  el.innerHTML = svg(w,h,o,'Scatter chart of 36 stores: inventory accuracy against profit per order');
+}
+function heatStyle(v){
+  const a = Math.max(6, Math.min(100, v / 75 * 100));
+  return `background:color-mix(in srgb,var(--heat) ${a.toFixed(0)}%,var(--surface));color:${a >= 85 ? 'var(--on-heat)' : 'var(--ink)'}`;
+}
+function drawHeat(O){
+  $('#oRTitle').textContent = 'Late deliveries by promise and distance';
+  $('#oRSub').textContent = '% of delivered orders that arrive late';
+  const cols = ['≤2 km','2–3 km','3–4 km','>4 km'];
+  let h = '<div class="heat"><span></span>' + cols.map(c=>`<span class="hh">${c}</span>`).join('');
+  O.heat.forEach(r => {
+    h += `<span class="hr">${r.promise}-min promise</span>` + r.cells.map((c,i) =>
+      `<div class="hc" style="${heatStyle(c.late)}" ${tip('<b>'+r.promise+'-minute promise, '+cols[i]+'</b><br>'+pct(c.late,1)+' late<br>'+nf(c.late_n)+' of '+nf(c.n)+' orders')} tabindex="0">${pct(c.late)}</div>`).join('');
+  });
+  h += '</div>';
+  $('#oR').innerHTML = h;
+  const p = O.peak, wx = O.weather;
+  $('#oRNote').innerHTML = `Average delivery takes <b>${O.avg_delivery.toFixed(0)} minutes</b> whatever the promise, so lateness comes from the promise. A 20-minute promise beyond 4 km is late <b>${pct(O.heat[0].cells[3].late)}</b> of the time.`;
+}
+function drawHours(O){
+  $('#oRTitle').textContent = 'Late deliveries by hour of day';
+  $('#oRSub').textContent = '% of delivered orders that arrive late. Orange = peak hours.';
+  const el = $('#oR'), w = wOf(el), h = 250, m = {l:40, r:6, t:22, b:44};
+  const hrs = O.hours, slot = (w-m.l-m.r)/hrs.length, bw = Math.max(6, slot*0.7);
+  const Y = v => m.t + (32 - v) * (h-m.t-m.b) / 32;
+  let o = '';
+  [0,10,20,30].forEach(v => { o += `<line class="${v===0?'ax':'gl'}" x1="${m.l}" x2="${w-m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="tm" x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${v}%</text>`; });
+  hrs.forEach((x,i) => {
+    const cx = m.l + slot*i + slot/2, lab = x.hour===12 ? '12p' : x.hour>12 ? (x.hour-12)+'p' : x.hour+'a';
+    o += `<rect class="mk" x="${(cx-bw/2).toFixed(1)}" y="${Y(x.late).toFixed(1)}" width="${bw.toFixed(1)}" height="${(Y(0)-Y(x.late)).toFixed(1)}" rx="3" fill="${x.peak?'var(--orange)':'var(--blue)'}" ${tip('<b>'+lab+'</b> ('+x.hour+':00)<br>'+pct(x.late,1)+' late<br>'+nf(x.n)+' delivered orders'+(x.peak?'<br>Peak hour':''))} tabindex="0"/>`;
+    o += `<text class="tm" x="${cx.toFixed(1)}" y="${Y(0)+16}" text-anchor="middle" style="font-size:${w<460?10:12}px">${lab}</text>`;
+    if(x.peak) o += `<text class="to" x="${cx.toFixed(1)}" y="${(Y(x.late)-6).toFixed(1)}" text-anchor="middle" style="font-size:12px">${x.late.toFixed(0)}%</text>`;
+  });
+  o += `<text class="t" x="${(m.l+w-m.r)/2}" y="${h-4}" text-anchor="middle">Hour order was placed (a = am, p = pm)</text>`;
+  el.innerHTML = svg(w,h,o,'Bar chart of late delivery percentage by hour of day');
+  const p = O.peak, wx = O.weather;
+  $('#oRNote').innerHTML = `Peak hours (12–2 pm, 7–10 pm) are <b>${pct(p.peak_late)}</b> late against <b>${pct(p.off_late)}</b> otherwise: ${pct(p.peak_order_share)} of orders but ${pct(p.peak_late_share)} of late ones. Rain: <b>${pct(wx.Rain)}</b> late. City is not the issue: profit per order is ${inr(O.city_range.lo)}–${inr(O.city_range.hi)} in all six cities.`;
+}
+
+/* ---------- 5 promo ---------- */
+function rPromo(){
+  const P = D.promo, c = P.counts, all = P.by_type[0];
+  $('#pTiles').innerHTML = [
+    [nf(c.treat)+' vs '+nf(c.ctrl),'customers: offer group vs no-offer group (random)',''],
+    [sgn(all.orders.diff,2,false),'extra orders per customer with any offer ('+pct(all.orders.diff/all.orders.ctrl*100)+' more)','blue'],
+    [sgn(all.profit.diff,1),'profit per customer with any offer','bad'],
+    [pct(c.active_redeem)+' vs '+pct(c.light_redeem),'offer redeemed: active vs lapsed or light customers','']
+  ].map(t=>`<div class="tile"><span class="v ${t[2]}" style="${t[0].length>12?'font-size:24px':''}">${t[0]}</span><span class="l">${t[1]}</span></div>`).join('');
+  $('#pTitle').textContent = state.pm==='type' ? 'All customers, by offer type' : 'By customer group (known before the campaign)';
+  drawPromo(state.pm==='type' ? P.by_type : P.by_group);
+  $('#pWhy').innerHTML = `<b>Why it matters:</b> active customers redeem the most but would have bought anyway, so for them the offer is only a discount. They are ${pct(c.active_share)} of the base.`;
+}
+function drawPromo(rows){
+  const el = $('#pc'), w = wOf(el), narrow = w < 640, labelW = narrow ? 128 : 214, gap = 26, rh = narrow ? 56 : 72, top = 30;
+  const pw = (w - labelW - gap) / 2, h = top + rows.length*rh + 30;
+  const pr = [labelW, labelW + pw + gap];
+  const dom = [[-42,16],[-0.2,0.45]];
+  const X = (p,v) => pr[p] + (v - dom[p][0]) * (pw - 52) / (dom[p][1]-dom[p][0]);
+  let o = '';
+  o += `<text class="tb" x="${pr[0]}" y="14">Profit per customer (₹)</text><text class="tb" x="${pr[1]}" y="14">Extra orders per customer</text>`;
+  [[-40,-20,0],[-0.2,0,0.2,0.4]].forEach((ticks,p) => ticks.forEach(v => {
+    o += `<line class="${v===0?'ax':'gl'}" x1="${X(p,v)}" x2="${X(p,v)}" y1="${top-6}" y2="${top+rows.length*rh}"/><text class="tm" x="${X(p,v)}" y="${top+rows.length*rh+18}" text-anchor="middle">${p===0 ? (v<0?'−':'')+Math.abs(v) : (v<0?'−':'')+Math.abs(v).toFixed(1)}</text>`;
+  }));
+  rows.forEach((r,i) => {
+    const y = top + i*rh, cy = y + rh/2 - 2;
+    o += `<text class="tb" x="0" y="${cy-2}" ${narrow?'style="font-size:12.5px"':''}>${esc(r.label)}</text><text class="tm" x="0" y="${cy+15}" style="font-size:12px">${nf(r.nT)} offered · ${nf(r.nC)} not</text>`;
+    [['profit',0],['orders',1]].forEach(([k,p]) => {
+      const e = r[k], z = X(p,0);
+      let col;
+      if(k==='profit') col = e.hi < 0 ? 'var(--orange)' : e.lo > 0 ? 'var(--green)' : 'var(--gray)';
+      else col = e.lo > 0 ? 'var(--blue)' : 'var(--gray)';
+      const x1 = Math.min(z, X(p,e.diff)), bw = Math.max(2, Math.abs(X(p,e.diff)-z));
+      const fmtv = v => k==='profit' ? sgn(v,1) : sgn(v,2,false);
+      const t = `<b>${esc(r.label)}</b><br>${nf(r.nT)} offered, ${nf(r.nC)} not offered<br>No offer: ${k==='profit'?inr(e.ctrl,1):e.ctrl.toFixed(2)} · Offer: ${k==='profit'?inr(e.treat,1):e.treat.toFixed(2)}<br>Difference <b>${fmtv(e.diff)}</b><br>95% range ${fmtv(e.lo)} to ${fmtv(e.hi)}`;
+      o += `<g ${tip(t)} tabindex="0" class="mk"><rect x="${Math.min(X(p,e.lo),x1)-2}" y="${y}" width="${Math.abs(X(p,e.hi)-X(p,e.lo))+8}" height="${rh-6}" fill="transparent"/>
+        <rect x="${x1.toFixed(1)}" y="${(cy-9).toFixed(1)}" width="${bw.toFixed(1)}" height="18" rx="3" fill="${col}"/>
+        <line x1="${X(p,e.lo).toFixed(1)}" x2="${X(p,e.hi).toFixed(1)}" y1="${cy}" y2="${cy}" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="${X(p,e.lo).toFixed(1)}" x2="${X(p,e.lo).toFixed(1)}" y1="${cy-5}" y2="${cy+5}" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="${X(p,e.hi).toFixed(1)}" x2="${X(p,e.hi).toFixed(1)}" y1="${cy-5}" y2="${cy+5}" stroke="var(--ink)" stroke-width="2"/>
+        <text class="${col==='var(--orange)'?'to':col==='var(--green)'?'tg':col==='var(--blue)'?'tbl':'t'}" x="${(pr[p]+pw-46).toFixed(1)}" y="${cy+5}" style="font-weight:700;font-size:14px">${fmtv(e.diff)}</text></g>`;
+    });
+  });
+  el.innerHTML = svg(w,h,o,'Offer effect on profit and orders per customer with 95 percent ranges');
+}
+
+/* ---------- 6 recommendation ---------- */
+function rRec(){
+  const R = D.rec, hv = R.heavy;
+  const k = n => (n<0?'−':'+') + '₹' + (Math.abs(n)/1000).toFixed(1) + 'K';
+  const cards = [
+    ['1','Evidence: randomized test','Offer only to lapsed or light customers', `${k(R.per1000_all_profit)} → ${k(R.per1000_tgt_profit)}<small>profit per 1,000 customers, with free delivery as the default offer</small>`,
+      [['Target', `No order in 90+ days, or 2 or fewer orders: ${pct(R.share_target)} of customers.`],
+       ['Effect', `Keeps about 9 in 10 of the extra orders (${R.per1000_tgt_orders} against ${R.per1000_all_orders} per 1,000 customers) and stops the loss. Free delivery gains about ₹6 per customer, with a wide range (about ₹0 to ₹12).`],
+       ['Trade-off', 'Active customers may order a little less.'],
+       ['Test first', 'Re-run the random test for 4 weeks.']]],
+    ['2','Evidence: store comparison','Fix stock-outs in 10 weak stores', `+₹${Math.round(R.inv_mid/1000)}K to +₹${Math.round(R.inv_hi/1000)}K<small>profit a year if they reach the accuracy of better stores</small>`,
+      [['Target', 'Stores at 90% inventory accuracy or below: S003, S011, S012, S016, S019, S026, S027, S033, S035, S036.'],
+       ['Effect', `+3.6% profit at 90–95% accuracy, +6.5% at above 95%. All refunds on delivered orders come from stock-outs.`],
+       ['Trade-off', 'Cost of stock counts is not in the data.'],
+       ['Test first', 'Pilot 3 stores for 8 weeks.']]],
+    ['3','Evidence: order data and test','Cap discounts for the busiest customers', `+₹${Math.round(hv.per5/1000)}K a year<small>for every ₹5 less discount, if orders hold (+${hv.per5_pct}% profit)</small>`,
+      [['Target', `Customers with 7+ orders: ${pct(hv.cust_share)} of buyers, ${pct(hv.order_share)} of orders. Average discount ${inr(hv.disc)}, against ${inr(hv.disc46)} at 4–6 orders.`],
+       ['Effect', `A cap near ₹40 adds up to ${lakh(hv.cap40)} a year.`],
+       ['Trade-off', 'They may order less.'],
+       ['Test first', 'Cap a random half for 6 weeks.']]]
+  ];
+  $('#recGrid').innerHTML = cards.map(c => `<div class="card rec"><div class="rh"><span class="num">${c[0]}</span><span class="tag">${c[1]}</span></div><h2>${c[2]}</h2><div class="prize">${c[3]}</div>
+    <dl>${c[4].map(r=>`<div><dt>${r[0]}</dt><dd>${r[1]}</dd></div>`).join('')}</dl></div>`).join('');
+}
+
+/* ---------- 7 how ---------- */
+const CHECKS = [
+  ['ok','Passed','No duplicate IDs. Profit per order matches the data dictionary formula on all 30,000 orders. Offer and no-offer groups look alike before the campaign.'],
+  ['fix','Handled','305 cancelled orders (1.0%) carry a refund and no margin. Kept, and shown as a separate loss. Late % and stock-out % use delivered orders only.'],
+  ['fix','Handled','Rating is blank for 45% of delivered orders. Not used.']
+];
+const USED = [
+  ['order time and store','Orders: when and where the order was placed.'], ['basket, discount, fee','Orders: money in.'], ['margin and cost fields','Orders: gross margin, picking cost, delivery cost.'],
+  ['refund, profit','Orders: results, never used to pick a target.'], ['stock-outs','Orders: items unavailable at picking.'], ['promise, distance, peak, weather','Orders: known when the order is placed.'],
+  ['cancelled, late','Orders: outcomes, used to describe the past.'], ['membership, channel, city tier','Customers: groups checked in Repeat Behavior.'],
+  ['past orders, past margin','Customers: order count and profit in the 12-month window.'], ['days since last order','Customers: known before the campaign.'],
+  ['inventory accuracy','Stores: used to find weak stores.'], ['format, delivery model, riders','Stores: shown in store details.'],
+  ['offer group and type','Offer test: the random assignment.'], ['post-campaign orders and profit','Offer test: the result.']
+];
+const NOTUSED = [
+  ['rating','Blank for 45% of delivered orders and known only after delivery.'], ['support contact flag','Known only after delivery; adds nothing to the answer.'], ['substitution count','Overlaps with stock-outs.'],
+  ['item and category counts','Do not change the answer.'], ['signup and store launch dates','Dates are inconsistent with orders.'], ['first-order offer','Not needed.'],
+  ['app sessions, impressions, clicks','Checked, but past orders and recency were enough.'], ['competitor intensity, catchment density','Blank for 3 stores / no clear effect.'], ['repeat order in 30 days','An outcome, never an input.']
+];
+function rHow(){
+  $('#chk').innerHTML = CHECKS.map(c=>`<li><span class="st ${c[0]}">${c[1]}</span><span>${c[2]}</span></li>`).join('');
+  $('#usedF').innerHTML = USED.map(u=>`<span title="${esc(u[1])}">${u[0]}</span>`).join('');
+  $('#notF').innerHTML = NOTUSED.map(u=>`<span title="${esc(u[1])}">${u[0]}</span>`).join('');
+}
+
+/* ---------- fit to window ---------- */
+const STAGE_W = 1360, STAGE_H = 900;
+function fitStage(){
+  const on = innerWidth >= 1000 && innerHeight >= 520;
+  const root = document.documentElement;
+  root.classList.toggle('fit', on);
+  if(on) root.style.setProperty('--z', Math.min(innerWidth/STAGE_W, innerHeight/STAGE_H, 1.5).toFixed(4));
+}
+fitStage();
+window.addEventListener('resize', ()=>{ const was=document.documentElement.classList.contains('fit'); fitStage(); if(was!==document.documentElement.classList.contains('fit')) render(); });
+
+/* ---------- start ---------- */
+buildNav();
+const startId = (location.hash || '').replace('#','');
+go(PAGES.find(p=>p[0]===startId) ? startId : 'context');
+window.addEventListener('hashchange',()=>{ const h=location.hash.replace('#',''); if(h!==state.page && PAGES.find(p=>p[0]===h)) go(h); });
+</script>
+
+</body></html>
